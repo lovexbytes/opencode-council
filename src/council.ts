@@ -1,4 +1,4 @@
-import type { Part, PluginInput, ToolContext } from "@opencode-ai/plugin";
+import type { PluginInput, ToolContext } from "@opencode-ai/plugin";
 import { loadCouncilConfig, type CouncilConfig } from "./config";
 import { parseModelRef, type ModelRef } from "./models";
 
@@ -18,6 +18,11 @@ type TranscriptEntry = {
   phase: string;
   speaker: string;
   content: string;
+};
+
+type Part = {
+  type: string;
+  text?: string;
 };
 
 function extractText(parts: Part[]): string {
