@@ -94,25 +94,34 @@ export const CouncilPlugin: Plugin = async (ctx) => {
           const councilId = `council-${Date.now()}`
           const socketPath = `/tmp/opencode-council-${councilId}.sock`
 
-          // Build tmux command - call bun directly with TUI path
-          const tuiPath = join(
-            process.env.HOME || "~",
-            ".config/opencode/opencode-council/packages/tui/dist/index.js"
-          )
+          // Find TUI path - try multiple locations
+          const home = process.env.HOME || "~"
+          const tuiPaths = [
+            // Standard location (if cloned to ~/.config/opencode/)
+            join(home, ".config/opencode/opencode-council/packages/tui/dist/index.js"),
+            // Current working directory (if running from repo)
+            join(process.cwd(), "packages/tui/dist/index.js"),
+            // Try COUNCIL_TUI env var if set
+            process.env.COUNCIL_TUI,
+          ].filter(Boolean) as string[]
           
-          // Check if TUI exists
-          try {
-            const check = Bun.spawn(["ls", "-la", tuiPath], { stdout: "pipe", stderr: "pipe" })
-            await check.exited
-            const checkOutput = await new Response(check.stdout).text()
-            console.error(`[Council] TUI check: ${checkOutput.trim()}`)
-            if (check.exitCode !== 0) {
-              const checkErr = await new Response(check.stderr).text()
-              console.error(`[Council] TUI not found: ${checkErr}`)
-              return `Error: TUI not found at ${tuiPath}. Please run install.sh first.`
+          let tuiPath: string | null = null
+          for (const path of tuiPaths) {
+            try {
+              const check = Bun.spawn(["ls", path], { stdout: "pipe", stderr: "pipe" })
+              await check.exited
+              if (check.exitCode === 0) {
+                tuiPath = path
+                console.error(`[Council] Found TUI at: ${path}`)
+                break
+              }
+            } catch {
+              // Continue to next path
             }
-          } catch (e: any) {
-            return `Error checking TUI: ${e.message}`
+          }
+          
+          if (!tuiPath) {
+            return `Error: TUI not found. Tried:\n${tuiPaths.join("\n")}\n\nPlease run install.sh first or set COUNCIL_TUI env var.`
           }
           
           const tuiArgs = [
