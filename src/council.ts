@@ -35,7 +35,16 @@ function extractText(parts: Part[]): string {
     .trim();
 }
 
-function memberLabel(member: CouncilMember): string {
+function memberLabel(member: CouncilMember, index?: number): string {
+  // Use seat number for display instead of model name
+  if (index !== undefined) {
+    return `Seat ${index + 1}`;
+  }
+  // Fallback: extract seat number from member name if it follows "Member N" pattern
+  const seatMatch = member.name.match(/Member\s+(\d+)/);
+  if (seatMatch) {
+    return `Seat ${seatMatch[1]}`;
+  }
   const fallback = member.name;
   const model = member.model?.split("/").pop();
   return model ? model : fallback;
@@ -171,7 +180,9 @@ export async function runCouncil(
     }
     for (const entry of streamState.initial) {
       if (entry) {
-        lines.push(`✅ **${entry.name}**: ${entry.content}`);
+        // Use blockquote for muted, indented styling
+        const indentedContent = entry.content.replace(/\n/g, '\n> ');
+        lines.push(`✅ **${entry.name}**:\n> ${indentedContent}`);
       }
     }
 
@@ -242,9 +253,9 @@ export async function runCouncil(
           directory: context.directory,
         });
         transcript.push({ phase: "Initial", speaker: member.name, content: text });
-        // Truncate long responses for the progress display
-        const displayText = text.length > 100 ? text.substring(0, 97) + "..." : text;
-        streamState.initial[index] = { name: memberLabel(member), content: displayText };
+        // Truncate long responses for the progress display (500 chars max)
+        const displayText = text.length > 500 ? text.substring(0, 497) + "..." : text;
+        streamState.initial[index] = { name: memberLabel(member, index), content: displayText };
         // Send progress update after each response
         await sendProgress(
           input.client,
@@ -323,7 +334,7 @@ export async function runCouncil(
         const targetIndex = typeof decision.target === "number" ? decision.target - 1 : 0;
         const member = members[targetIndex] ?? members[0];
         const question = decision.question ?? "Please clarify your recommendation.";
-        streamState.discussion.push(`🎤 **Speaker** → ${memberLabel(member)}: ${question}`);
+        streamState.discussion.push(`🎤 **Speaker** → **${memberLabel(member, targetIndex)}**: ${question}`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -342,9 +353,10 @@ export async function runCouncil(
         });
 
         transcript.push({ phase: "Clarification", speaker: member.name, content: memberAnswer });
-        // Truncate long responses for display
-        const displayAnswer = memberAnswer.length > 100 ? memberAnswer.substring(0, 97) + "..." : memberAnswer;
-        streamState.discussion.push(`💬 **${memberLabel(member)}**: ${displayAnswer}`);
+        // Truncate long responses for display (500 chars max)
+        const displayAnswer = memberAnswer.length > 500 ? memberAnswer.substring(0, 497) + "..." : memberAnswer;
+        // Indented, muted styling using blockquote for council member responses
+        streamState.discussion.push(`💬 **${memberLabel(member, targetIndex)}**:\n> ${displayAnswer.replace(/\n/g, '\n> ')}`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -382,11 +394,11 @@ export async function runCouncil(
         const voteIndex = parsed?.vote ? Number(parsed.vote) : NaN;
         const normalizedVote = Number.isFinite(voteIndex) ? voteIndex : 1;
         const vote = Math.min(Math.max(normalizedVote, 1), members.length);
-        const choice = members[vote - 1];
-        const choiceLabel = choice ? memberLabel(choice) : `Member ${vote}`;
+        // Show "Seat N's solution" instead of model name for clarity
+        const choiceLabel = `Seat ${vote}'s solution`;
 
         streamState.votes[index] = {
-          voter: memberLabel(member),
+          voter: memberLabel(member, index),
           choice: choiceLabel,
         };
 
@@ -419,7 +431,7 @@ export async function runCouncil(
     // Phase 4: Winner
     const winnerVotes = voteCounts.get(winnerIndex) ?? 0;
     streamState.winner = {
-      name: memberLabel(winner),
+      name: memberLabel(winner, winnerIndex - 1),
       votes: winnerVotes,
     };
 
