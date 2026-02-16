@@ -4,7 +4,7 @@ Multi‑model council deliberation for OpenCode with a Speaker‑led discussion,
 
 ## Features
 
-- `/council <message>` command (via config) that runs a multi‑model council
+- LLM-callable council tool for multi‑model deliberation
 - Initial parallel responses from N models
 - Speaker‑led discussion with clarifying questions
 - Voting phase + final Speaker synthesis
@@ -80,33 +80,20 @@ Example config:
 - Speaker model must be specified
 - All models must be available in your OpenCode provider config
 
-## Add the `/council` Command
-
-Add this to your OpenCode config:
-
-```json
-{
-  "command": {
-    "council": {
-      "description": "Run a multi-model council deliberation",
-      "template": "You MUST call the `council` tool with the following message: $ARGUMENTS\n\nDo not respond with text. Use the tool now."
-    }
-  }
-}
-```
-
 ## Usage
 
-In OpenCode, type:
+Ask your question naturally in OpenCode. The model can invoke the council tool when the request warrants multiple perspectives.
+
+**Explicit invocation (optional):**
 
 ```
-/council How should we refactor our caching layer for reliability?
+Use the council tool to answer: How should we refactor our caching layer for reliability?
 ```
 
 Or with more context:
 
 ```
-/council We're choosing between Redis, Memcached, and an in-memory solution. What's best for our scale?
+Use the council tool to answer: We're choosing between Redis, Memcached, and an in-memory solution. What's best for our scale?
 ```
 
 ## What You'll See

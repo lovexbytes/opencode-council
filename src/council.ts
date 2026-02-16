@@ -354,7 +354,7 @@ export async function runCouncil(
     const output = [
       STAGES.join("\n"),
       needsUserInput
-        ? `\n**Speaker needs more input:** ${needsUserInput}\n\nPlease reply with the missing details and re-run /council.`
+        ? `\n**Speaker needs more input:** ${needsUserInput}\n\nPlease reply with the missing details and run the council tool again.`
         : "",
       "\n## Winning solution",
       speakerText,
