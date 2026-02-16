@@ -3,7 +3,7 @@ set -euo pipefail
 
 COUNCIL_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="${HOME}/.config/opencode"
-PLUGIN_DIR="${CONFIG_DIR}/plugins"
+PLUGIN_DIR="${CONFIG_DIR}/plugin"
 
 echo "🔧 Installing OpenCode Council..."
 
@@ -30,7 +30,7 @@ echo "🔨 Building TUI..."
 cd "$COUNCIL_DIR/packages/tui"
 bun build ./src/index.tsx --outdir dist --target bun --external react --external ink
 
-# Copy plugin to global plugins directory
+# Copy plugin to global plugin directory (singular)
 echo "📋 Installing plugin..."
 cp "$COUNCIL_DIR/packages/plugin/dist/index.js" "$PLUGIN_DIR/council.js"
 
