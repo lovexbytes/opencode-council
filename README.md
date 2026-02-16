@@ -26,36 +26,30 @@ This creates `dist/plugin.js` (and `dist/opencode-council.js`) which OpenCode ca
 
 ## Installation in OpenCode (Local/Bun)
 
-OpenCode loads local plugins from `.opencode/plugin/` or `.opencode/plugins/` directories
-and **does not** look in `~/.config/opencode/` for plugins.
+OpenCode auto‑loads local plugins from **any** of these directories:
+- `~/.config/opencode/plugin/` or `~/.config/opencode/plugins/`
+- `~/.opencode/plugin/` or `~/.opencode/plugins/`
+- `${PROJECT}/.opencode/plugin/` or `${PROJECT}/.opencode/plugins/`
 
 **Global install (recommended):**
 ```bash
 # Copy built plugin to OpenCode's global plugin directory
-mkdir -p ~/.opencode/plugins
-cp dist/opencode-council.js ~/.opencode/plugins/opencode-council.js
+mkdir -p ~/.config/opencode/plugins
+cp dist/plugin.js ~/.config/opencode/plugins/opencode-council.js
 ```
 
-You can now either:
-- **Let auto-loading handle it** (no config needed), or
-- **Keep a plugin entry** in your config and it will resolve to the local file:
+✅ **No config entry needed.** OpenCode will auto‑load any `*.js`/`*.ts` file in those folders.
 
+**Or use an absolute file URL directly (explicit config):**
 ```json
 {
   "plugin": [
-    "opencode-council"
+    "file:///ABSOLUTE/PATH/opencode-council/dist/plugin.js"
   ]
 }
 ```
 
-**Or use an absolute file URL directly:**
-```json
-{
-  "plugin": [
-    "file:///ABSOLUTE/PATH/opencode-council/dist/opencode-council.js"
-  ]
-}
-```
+**Important:** A bare name like `"opencode-council"` tells OpenCode to install from npm via Bun. For local builds, use a `file://` URL or the plugin folders above.
 
 ## Configure Council Models
 

@@ -3,19 +3,19 @@
   "version": "0.1.0",
   "description": "OpenCode council plugin for multi-model deliberation and speaker synthesis",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/plugin.js",
+  "types": "./dist/plugin.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/plugin.js",
+      "types": "./dist/plugin.d.ts"
     },
     "./plugin": {
-      "import": "./dist/plugin.js",
+      "default": "./dist/plugin.js",
       "types": "./dist/plugin.d.ts"
     },
     "./opencode-council": {
-      "import": "./dist/opencode-council.js",
+      "default": "./dist/opencode-council.js",
       "types": "./dist/opencode-council.d.ts"
     }
   },
