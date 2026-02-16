@@ -94,19 +94,32 @@ export const CouncilPlugin: Plugin = async (ctx) => {
           const councilId = `council-${Date.now()}`
           const socketPath = `/tmp/opencode-council-${councilId}.sock`
 
-          // Build tmux command
-          const tuiBin = join(
+          // Build tmux command - call bun directly with TUI path
+          const tuiPath = join(
             process.env.HOME || "~",
-            ".config/opencode/council-tui"
+            ".config/opencode/opencode-council/packages/tui/dist/index.js"
           )
+          
+          // Check if TUI exists
+          try {
+            const check = Bun.spawn(["ls", "-la", tuiPath], { stdout: "pipe", stderr: "pipe" })
+            await check.exited
+            if (check.exitCode !== 0) {
+              return `Error: TUI not found at ${tuiPath}. Please run install.sh first.`
+            }
+          } catch (e: any) {
+            return `Error checking TUI: ${e.message}`
+          }
+          
           const tuiArgs = [
-            tuiBin,
+            "bun",
+            tuiPath,
             "--socket", socketPath,
             "--question", args.question,
             "--models", JSON.stringify(config.models),
             "--timeout", String(config.timeout),
             "--synthesize", String(config.synthesize),
-          ].map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ")
+          ].join(" ")
 
           const tmuxArgs: string[] = []
           if (config.tmux.mode === "split") {
@@ -123,15 +136,22 @@ export const CouncilPlugin: Plugin = async (ctx) => {
           tmuxArgs.push(tuiArgs)
 
           try {
+            console.error(`[Council] Spawning: tmux ${tmuxArgs.join(" ")}`)
             const proc = Bun.spawn(["tmux", ...tmuxArgs], {
-              stdout: "ignore",
+              stdout: "pipe",
               stderr: "pipe",
             })
             await proc.exited
 
+            const stderr = await new Response(proc.stderr).text()
+            const stdout = await new Response(proc.stdout).text()
+            
+            console.error(`[Council] tmux exit code: ${proc.exitCode}`)
+            console.error(`[Council] tmux stderr: ${stderr}`)
+            console.error(`[Council] tmux stdout: ${stdout}`)
+
             if (proc.exitCode !== 0) {
-              const stderr = await new Response(proc.stderr).text()
-              return `Error spawning council tmux pane: ${stderr}`
+              return `Error spawning council tmux pane (code ${proc.exitCode}): ${stderr}`
             }
           } catch (e: any) {
             return `Failed to spawn council: ${e.message}. Is tmux running?`
