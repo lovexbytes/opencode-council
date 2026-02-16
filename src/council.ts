@@ -150,45 +150,64 @@ export async function runCouncil(
     sessionID: context.sessionID,
     messageID: context.messageID,
     type: "text",
-    text: "🏛 Council Discussion\n\n**Initial Responses:**",
+    text: "🏛 Council Discussion starting...",
   };
+  
+  // State to track the content of each phase
   const streamState = {
     initial: members.map(() => null as null | { name: string; content: string }),
     discussion: [] as string[],
-    votes: members.map(() => null as null | string),
-    winner: null as null | string,
-    final: null as null | string,
+    votes: members.map(() => null as null | { voter: string; choice: string }),
+    winner: null as null | { name: string; votes: number },
   };
 
   const renderStream = () => {
-    const initialLines = streamState.initial
-      .filter(Boolean)
-      .map((entry) => `• ${entry!.name}: ${entry!.content}`);
-    const discussionLines = streamState.discussion.length
-      ? streamState.discussion
-      : ["(pending)"];
-    const voteLines = streamState.votes.filter(Boolean) as string[];
-    const winnerLine = streamState.winner ? streamState.winner : "(pending)";
-    const finalBlock = streamState.final ? `\n\n${streamState.final}` : "";
-
-    return [
-      "🏛 Council Discussion",
-      "",
-      "**Initial Responses:**",
-      ...(initialLines.length ? initialLines : ["(pending)"]),
-      "",
-      "**Discussion:**",
-      ...discussionLines,
-      "",
-      "**Voting:**",
-      ...(voteLines.length ? voteLines : ["(pending)"]),
-      "",
-      "**Final Result:**",
-      winnerLine,
-      finalBlock,
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+    const lines: string[] = ["🏛 Council Discussion"];
+    
+    // Phase 1: Initial Responses
+    lines.push("", "**Initial Responses**");
+    const initialComplete = streamState.initial.every((e) => e !== null);
+    if (!initialComplete) {
+      lines.push("*(collecting responses...)*");
+    }
+    for (const entry of streamState.initial) {
+      if (entry) {
+        lines.push(`• ${entry.name}: ${entry.content}`);
+      }
+    }
+    
+    // Phase 2: Discussion
+    if (streamState.discussion.length > 0) {
+      lines.push("", "**Discussion**");
+      for (const entry of streamState.discussion) {
+        lines.push(entry);
+      }
+    }
+    
+    // Phase 3: Voting
+    const votesComplete = streamState.votes.every((v) => v !== null);
+    if (votesComplete || streamState.votes.some((v) => v !== null)) {
+      lines.push("", "**Voting**");
+      if (!votesComplete) {
+        lines.push("*(collecting votes...)*");
+      }
+      for (const vote of streamState.votes) {
+        if (vote) {
+          lines.push(`• ${vote.voter} votes for: ${vote.choice}`);
+        }
+      }
+    }
+    
+    // Phase 4: Winner
+    if (streamState.winner) {
+      lines.push(
+        "",
+        "**Winner:**",
+        `${streamState.winner.name} (${streamState.winner.votes} vote${streamState.winner.votes === 1 ? "" : "s"})`
+      );
+    }
+    
+    return lines.join("\n");
   };
 
   const updateStream = async () => {
@@ -227,7 +246,9 @@ export async function runCouncil(
           directory: context.directory,
         });
         transcript.push({ phase: "Initial", speaker: member.name, content: text });
-        streamState.initial[index] = { name: memberLabel(member), content: text };
+        // Truncate long responses for the stream display
+        const displayText = text.length > 100 ? text.substring(0, 97) + "..." : text;
+        streamState.initial[index] = { name: memberLabel(member), content: displayText };
         await updateStream();
         return { member, text };
       }),
@@ -292,7 +313,9 @@ export async function runCouncil(
           directory: context.directory,
         });
         transcript.push({ phase: "Clarification", speaker: member.name, content: memberAnswer });
-        streamState.discussion.push(`${memberLabel(member)}: ${memberAnswer}`);
+        // Truncate long responses for display
+        const displayAnswer = memberAnswer.length > 100 ? memberAnswer.substring(0, 97) + "..." : memberAnswer;
+        streamState.discussion.push(`${memberLabel(member)}: ${displayAnswer}`);
         await updateStream();
       }
     }
@@ -317,7 +340,11 @@ export async function runCouncil(
         const normalizedVote = Number.isFinite(voteIndex) ? voteIndex : 1;
         const vote = Math.min(Math.max(normalizedVote, 1), members.length);
         const choice = members[vote - 1];
-        streamState.votes[index] = `${memberLabel(member)} votes for: ${choice ? memberLabel(choice) : `Member ${vote}`}`;
+        const choiceLabel = choice ? memberLabel(choice) : `Member ${vote}`;
+        streamState.votes[index] = { 
+          voter: memberLabel(member), 
+          choice: choiceLabel 
+        };
         await updateStream();
         return {
           voter: member.name,
@@ -353,8 +380,10 @@ export async function runCouncil(
     });
 
     const winnerVotes = voteCounts.get(winnerIndex) ?? 0;
-    streamState.winner = `Winner: ${memberLabel(winner)} (${winnerVotes} vote${winnerVotes === 1 ? "" : "s"})`;
-    streamState.final = speakerText;
+    streamState.winner = { 
+      name: memberLabel(winner), 
+      votes: winnerVotes 
+    };
     await updateStream();
 
     const voteSummary = votes
