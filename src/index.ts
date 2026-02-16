@@ -23,9 +23,9 @@ const CouncilPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
 
       output.parts = output.parts.map((part) => {
         if (part.type !== "text") return part;
-        if (!part.text.includes("{message}")) return part;
+        if (!part.text.includes("$ARGUMENTS")) return part;
 
-        const replaced = part.text.replaceAll("{message}", args);
+        const replaced = part.text.replaceAll("$ARGUMENTS", args);
         const trailing = new RegExp(`\\n\\n${args.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`);
         return {
           ...part,

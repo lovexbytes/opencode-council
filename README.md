@@ -89,7 +89,7 @@ Add this to your OpenCode config:
   "command": {
     "council": {
       "description": "Run a multi-model council deliberation",
-      "template": "Call the council tool with message: $ARGUMENTS"
+      "template": "You MUST call the `council` tool with the following message: $ARGUMENTS\n\nDo not respond with text. Use the tool now."
     }
   }
 }
