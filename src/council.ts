@@ -4,9 +4,10 @@ import { loadCouncilConfig, type CouncilConfig } from "./config";
 import { parseModelRef, type ModelRef } from "./models";
 
 const STAGES = [
-  "Council — initial discussions...",
-  "Council — refining the solutions...",
-  "Council — voting...",
+  "🏛 Council — Initial discussions...",
+  "🏛 Council — Refining solutions...",
+  "🏛 Council — Voting phase...",
+  "🏛 Council — Synthesizing winner...",
 ];
 
 type CouncilMember = {
@@ -26,26 +27,12 @@ type Part = {
   text?: string;
 };
 
-type StreamPart = {
-  id: string;
-  sessionID: string;
-  messageID: string;
-  type: "text";
-  text: string;
-};
-
 function extractText(parts: Part[]): string {
   return parts
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n")
     .trim();
-}
-
-function createPartId(): string {
-  const time = Date.now().toString(16).padStart(12, "0");
-  const rand = Math.random().toString(36).slice(2, 14);
-  return `prt_${time}${rand}`;
 }
 
 function memberLabel(member: CouncilMember): string {
@@ -120,6 +107,31 @@ async function promptModel(input: {
   return text;
 }
 
+/**
+ * Send a progress update message to the session.
+ * This creates a visible message that the user sees immediately.
+ */
+async function sendProgress(
+  client: PluginInput["client"],
+  sessionID: string,
+  directory: string,
+  text: string,
+): Promise<void> {
+  try {
+    await client.session.promptAsync({
+      path: { id: sessionID },
+      query: { directory },
+      body: {
+        noReply: true, // Don't generate a response
+        parts: [{ type: "text", text }],
+      },
+    });
+  } catch (error) {
+    // Silently ignore progress message failures - not critical
+    console.error("Failed to send progress:", error);
+  }
+}
+
 export async function runCouncil(
   input: PluginInput,
   context: ToolContext,
@@ -127,7 +139,7 @@ export async function runCouncil(
 ): Promise<string> {
   // Fallback for undefined context.directory - use current working directory
   const projectDir = context.directory || process.cwd();
-  
+
   const config = await loadCouncilConfig(projectDir);
   const members = buildMembers(config);
   const speakerRef = ensureSpeaker(config.speaker);
@@ -140,20 +152,7 @@ export async function runCouncil(
     process.env.OPENCODE_URL ??
     "http://localhost:4096";
 
-  const streamingClient = createOpencodeClientV2({
-    baseUrl: resolvedServerUrl,
-    directory: projectDir,
-  });
-  const streamPartID = createPartId();
-  let streamPart: StreamPart = {
-    id: streamPartID,
-    sessionID: context.sessionID,
-    messageID: context.messageID,
-    type: "text",
-    text: "🏛 Council Discussion starting...",
-  };
-  
-  // State to track the content of each phase
+  // State to track the content of each phase for the final result
   const streamState = {
     initial: members.map(() => null as null | { name: string; content: string }),
     discussion: [] as string[],
@@ -161,77 +160,74 @@ export async function runCouncil(
     winner: null as null | { name: string; votes: number },
   };
 
-  const renderStream = () => {
-    const lines: string[] = ["🏛 Council Discussion"];
-    
+  const renderProgress = () => {
+    const lines: string[] = ["🏛 **Council Discussion in Progress**"];
+
     // Phase 1: Initial Responses
-    lines.push("", "**Initial Responses**");
+    lines.push("", "### 📋 Initial Responses");
     const initialComplete = streamState.initial.every((e) => e !== null);
     if (!initialComplete) {
-      lines.push("*(collecting responses...)*");
+      lines.push("⏳ Collecting initial responses from council members...");
     }
     for (const entry of streamState.initial) {
       if (entry) {
-        lines.push(`• ${entry.name}: ${entry.content}`);
+        lines.push(`✅ **${entry.name}**: ${entry.content}`);
       }
     }
-    
+
     // Phase 2: Discussion
     if (streamState.discussion.length > 0) {
-      lines.push("", "**Discussion**");
+      lines.push("", "### 💬 Discussion");
       for (const entry of streamState.discussion) {
         lines.push(entry);
       }
     }
-    
+
     // Phase 3: Voting
     const votesComplete = streamState.votes.every((v) => v !== null);
     if (votesComplete || streamState.votes.some((v) => v !== null)) {
-      lines.push("", "**Voting**");
+      lines.push("", "### 🗳️ Voting");
       if (!votesComplete) {
-        lines.push("*(collecting votes...)*");
+        lines.push("⏳ Collecting votes...");
       }
       for (const vote of streamState.votes) {
         if (vote) {
-          lines.push(`• ${vote.voter} votes for: ${vote.choice}`);
+          lines.push(`🗳️ **${vote.voter}** votes for: ${vote.choice}`);
         }
       }
     }
-    
+
     // Phase 4: Winner
     if (streamState.winner) {
       lines.push(
         "",
-        "**Winner:**",
-        `${streamState.winner.name} (${streamState.winner.votes} vote${streamState.winner.votes === 1 ? "" : "s"})`
+        "### 🏆 Winner",
+        `**${streamState.winner.name}** (${streamState.winner.votes} vote${streamState.winner.votes === 1 ? "" : "s"})`
       );
     }
-    
+
     return lines.join("\n");
   };
 
-  const updateStream = async () => {
-    const nextText = renderStream();
-    if (nextText === streamPart.text) return;
-    streamPart = { ...streamPart, text: nextText };
-    try {
-      await streamingClient.part.update({
-        sessionID: context.sessionID,
-        messageID: context.messageID,
-        partID: streamPartID,
-        directory: context.directory,
-        part: streamPart,
-      });
-    } catch {
-      // Ignore streaming failures to avoid breaking the council.
-    }
-  };
-
-  await updateStream();
+  // Send initial progress message
+  await sendProgress(
+    input.client,
+    context.sessionID,
+    context.directory,
+    "🏛 Council Discussion starting..."
+  );
 
   const councilSessionID = await createDiscussionSession(input, context);
 
   try {
+    // Phase 1: Initial Responses
+    await sendProgress(
+      input.client,
+      context.sessionID,
+      context.directory,
+      STAGES[0]
+    );
+
     const initialPrompt = `You are a council member. Provide your best response to the user request.\n\nDeliverables:\n- Key considerations\n- Risks or blind spots\n- Recommended approach\n\nUser request:\n${message}`;
 
     const initialResponses = await Promise.all(
@@ -246,15 +242,29 @@ export async function runCouncil(
           directory: context.directory,
         });
         transcript.push({ phase: "Initial", speaker: member.name, content: text });
-        // Truncate long responses for the stream display
+        // Truncate long responses for the progress display
         const displayText = text.length > 100 ? text.substring(0, 97) + "..." : text;
         streamState.initial[index] = { name: memberLabel(member), content: displayText };
-        await updateStream();
+        // Send progress update after each response
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
         return { member, text };
       }),
     );
 
     let needsUserInput: string | null = null;
+
+    // Phase 2: Discussion
+    await sendProgress(
+      input.client,
+      context.sessionID,
+      context.directory,
+      STAGES[1]
+    );
 
     for (let turn = 0; turn < config.discussion.maxTurns; turn++) {
       const discussionPrompt = `You are the Council Speaker. Review the discussion so far and decide the next action.\n\nAvailable actions:\n- ask_member: ask one member a clarifying question\n- ask_user: request missing info from the user\n- end: finish discussion and move to voting\n\nReturn ONLY valid JSON with this shape:\n{ "action": "ask_member" | "ask_user" | "end", "target": number, "question": string, "summary": string }\n\nContext:\nUser request: ${message}\n\nInitial responses:\n${initialResponses
@@ -288,12 +298,24 @@ export async function runCouncil(
       if (decision.action === "ask_user") {
         const question = decision.question ?? "The Speaker needs more details.";
         needsUserInput = question;
-        streamState.discussion.push(`Speaker: ${question}`);
-        await updateStream();
+        streamState.discussion.push(`🎤 **Speaker**: ${question}`);
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
         break;
       }
 
       if (decision.action === "end") {
+        streamState.discussion.push(`✅ **Speaker**: Discussion complete, moving to voting.`);
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
         break;
       }
 
@@ -301,8 +323,14 @@ export async function runCouncil(
         const targetIndex = typeof decision.target === "number" ? decision.target - 1 : 0;
         const member = members[targetIndex] ?? members[0];
         const question = decision.question ?? "Please clarify your recommendation.";
-        streamState.discussion.push(`Speaker: ${question}`);
-        await updateStream();
+        streamState.discussion.push(`🎤 **Speaker** → ${memberLabel(member)}: ${question}`);
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
+
         const memberAnswer = await promptModel({
           client: input.client,
           sessionID: councilSessionID,
@@ -312,13 +340,27 @@ export async function runCouncil(
           label: `${member.name} clarification`,
           directory: context.directory,
         });
+
         transcript.push({ phase: "Clarification", speaker: member.name, content: memberAnswer });
         // Truncate long responses for display
         const displayAnswer = memberAnswer.length > 100 ? memberAnswer.substring(0, 97) + "..." : memberAnswer;
-        streamState.discussion.push(`${memberLabel(member)}: ${displayAnswer}`);
-        await updateStream();
+        streamState.discussion.push(`💬 **${memberLabel(member)}**: ${displayAnswer}`);
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
       }
     }
+
+    // Phase 3: Voting
+    await sendProgress(
+      input.client,
+      context.sessionID,
+      context.directory,
+      STAGES[2]
+    );
 
     const votingPrompt = `You are in the voting phase. Review the council discussion and select the strongest solution.\n\nReturn ONLY valid JSON with this shape:\n{ "vote": number, "reason": string }\n\nVote must be the member number (1-${members.length}).\n\nInitial responses:\n${initialResponses
       .map((entry) => `${entry.member.name}: ${entry.text}`)
@@ -335,17 +377,26 @@ export async function runCouncil(
           label: `${member.name} vote`,
           directory: context.directory,
         });
+
         const parsed = pickJson(response) as { vote?: number; reason?: string } | null;
         const voteIndex = parsed?.vote ? Number(parsed.vote) : NaN;
         const normalizedVote = Number.isFinite(voteIndex) ? voteIndex : 1;
         const vote = Math.min(Math.max(normalizedVote, 1), members.length);
         const choice = members[vote - 1];
         const choiceLabel = choice ? memberLabel(choice) : `Member ${vote}`;
-        streamState.votes[index] = { 
-          voter: memberLabel(member), 
-          choice: choiceLabel 
+
+        streamState.votes[index] = {
+          voter: memberLabel(member),
+          choice: choiceLabel,
         };
-        await updateStream();
+
+        await sendProgress(
+          input.client,
+          context.sessionID,
+          context.directory,
+          renderProgress()
+        );
+
         return {
           voter: member.name,
           vote,
@@ -365,6 +416,20 @@ export async function runCouncil(
     const winnerIndex = tied[0] ?? 1;
     const winner = members[winnerIndex - 1];
 
+    // Phase 4: Winner
+    const winnerVotes = voteCounts.get(winnerIndex) ?? 0;
+    streamState.winner = {
+      name: memberLabel(winner),
+      votes: winnerVotes,
+    };
+
+    await sendProgress(
+      input.client,
+      context.sessionID,
+      context.directory,
+      STAGES[3]
+    );
+
     const speakerPrompt = `You are the Council Speaker. Produce the final response for the user.\n\nUser request:\n${message}\n\nWinning member: ${winner.name} (Member ${winnerIndex})\n\nInitial responses:\n${initialResponses
       .map((entry) => `${entry.member.name}: ${entry.text}`)
       .join("\n\n")}\n\nDiscussion transcript:\n${transcript.map((entry) => `${entry.speaker} (${entry.phase}): ${entry.content}`).join("\n\n")}\n\nVoting summary:\n${votes.map((vote) => `${vote.voter} voted for Member ${vote.vote} (${vote.reason})`).join("\n")}\n\nDeliver a clear, actionable final response. If critical details are missing, state them explicitly.`;
@@ -379,12 +444,12 @@ export async function runCouncil(
       directory: context.directory,
     });
 
-    const winnerVotes = voteCounts.get(winnerIndex) ?? 0;
-    streamState.winner = { 
-      name: memberLabel(winner), 
-      votes: winnerVotes 
-    };
-    await updateStream();
+    await sendProgress(
+      input.client,
+      context.sessionID,
+      context.directory,
+      renderProgress()
+    );
 
     const voteSummary = votes
       .map((vote) => `- ${vote.voter} → Member ${vote.vote}`)
@@ -395,11 +460,11 @@ export async function runCouncil(
       needsUserInput
         ? `\n**Speaker needs more input:** ${needsUserInput}\n\nPlease reply with the missing details and run the council tool again.`
         : "",
-      "\n## Winning solution",
+      "\n## 🏆 Winning solution",
       speakerText,
-      "\n## Votes",
+      "\n## 🗳️ Votes",
       voteSummary || "- (no votes parsed)",
-      "\n<details>\n<summary>Live council discussion</summary>\n\n" +
+      "\n<details>\n<summary>📜 Full council transcript</summary>\n\n" +
         formatTranscript(transcript) +
         "\n\n</details>",
     ]
