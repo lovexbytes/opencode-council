@@ -1,11 +1,30 @@
 #!/bin/bash
 set -euo pipefail
 
-COUNCIL_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Use standard location in ~/.config
 CONFIG_DIR="${HOME}/.config/opencode"
+STANDARD_DIR="${CONFIG_DIR}/opencode-council"
 PLUGIN_DIR="${CONFIG_DIR}/plugin"
 
-echo "🔧 Installing OpenCode Council..."
+# Determine where to install from
+if [[ "$(cd "$(dirname "$0")" && pwd)" == "$STANDARD_DIR" ]]; then
+  # Already in standard location
+  COUNCIL_DIR="$STANDARD_DIR"
+  echo "🔧 Installing OpenCode Council from standard location..."
+else
+  # Need to clone to standard location
+  echo "📥 Installing to standard location: $STANDARD_DIR"
+  if [ -d "$STANDARD_DIR/.git" ]; then
+    echo "  (Updating existing installation)"
+    cd "$STANDARD_DIR" && git pull
+  else
+    rm -rf "$STANDARD_DIR"  # Remove if exists but not git repo
+    git clone https://github.com/lovexbytes/opencode-council.git "$STANDARD_DIR"
+  fi
+  COUNCIL_DIR="$STANDARD_DIR"
+fi
+
+echo "  Location: $COUNCIL_DIR"
 
 # Check prerequisites
 command -v bun >/dev/null 2>&1 || { echo "❌ bun is required. Install: curl -fsSL https://bun.sh/install | bash"; exit 1; }
@@ -18,7 +37,7 @@ mkdir -p "${CONFIG_DIR}"
 # Install dependencies
 echo "📦 Installing dependencies..."
 cd "$COUNCIL_DIR"
-bun install
+bun install 2>/dev/null || npm install
 
 # Build plugin
 echo "🔨 Building plugin..."
@@ -30,19 +49,9 @@ echo "🔨 Building TUI..."
 cd "$COUNCIL_DIR/packages/tui"
 bun build ./src/index.tsx --outdir dist --target bun --external react --external ink
 
-# Copy plugin to global plugin directory (singular)
+# Copy plugin to global plugin directory
 echo "📋 Installing plugin..."
 cp "$COUNCIL_DIR/packages/plugin/dist/index.js" "$PLUGIN_DIR/council.js"
-
-# Install TUI binary
-echo "📋 Installing TUI..."
-COUNCIL_TUI="${CONFIG_DIR}/council-tui"
-cat > "$COUNCIL_TUI" << 'WRAPPER'
-#!/bin/bash
-exec bun COUNCIL_TUI_DIR/dist/index.js "$@"
-WRAPPER
-sed -i "s|COUNCIL_TUI_DIR|${COUNCIL_DIR}/packages/tui|g" "$COUNCIL_TUI"
-chmod +x "$COUNCIL_TUI"
 
 # Create default config if not exists
 if [ ! -f "${CONFIG_DIR}/council.json" ]; then
@@ -71,7 +80,7 @@ echo "✅ OpenCode Council installed!"
 echo ""
 echo "Files:"
 echo "  Plugin:  $PLUGIN_DIR/council.js"
-echo "  TUI:     $COUNCIL_TUI"
+echo "  TUI:     $COUNCIL_DIR/packages/tui/dist/index.js"
 echo "  Config:  ${CONFIG_DIR}/council.json"
 echo ""
 echo "Usage:"
