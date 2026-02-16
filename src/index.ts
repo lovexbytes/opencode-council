@@ -6,14 +6,13 @@ const CouncilPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
   return {
     tool: {
       council: tool({
-        description: "Consult multiple AI models on a question and synthesize their responses.",
+        description: "Consult multiple AI models on a question. Provide the question as the message argument.",
         args: {
-          message: tool.schema
-            .string()
-            .describe("The question or topic for the council."),
+          message: tool.schema.string().describe("The question or topic for the council."),
         },
-        async execute({ message }, context) {
+        async execute(args, context) {
           context.metadata({ title: "Council" });
+          const message = args.message as string;
           return runCouncil(input, context, message);
         },
       }),

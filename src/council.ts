@@ -1,6 +1,4 @@
 import type { PluginInput, ToolContext } from "@opencode-ai/plugin";
-import { createOpencodeClient as createOpencodeClientV2, type OpencodeClient } from "@opencode-ai/sdk/v2";
-import { randomUUID } from "crypto";
 import { loadCouncilConfig, type CouncilConfig } from "./config";
 import { parseModelRef, type ModelRef } from "./models";
 
@@ -97,39 +95,6 @@ async function createDiscussionSession(input: PluginInput, context: ToolContext)
   return sessionID;
 }
 
-async function updateReasoningPart(input: {
-  client: OpencodeClient;
-  sessionID: string;
-  messageID: string;
-  directory: string;
-  partID: string;
-  text: string;
-  startTime: number;
-  endTime?: number;
-}): Promise<void> {
-  try {
-    await input.client.part.update({
-      sessionID: input.sessionID,
-      messageID: input.messageID,
-      partID: input.partID,
-      directory: input.directory,
-      part: {
-        id: input.partID,
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        type: "reasoning",
-        text: input.text,
-        time: {
-          start: input.startTime,
-          ...(input.endTime ? { end: input.endTime } : {}),
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Failed to update reasoning part:", error);
-  }
-}
-
 async function promptModel(input: {
   client: PluginInput["client"];
   sessionID: string;
@@ -176,16 +141,9 @@ export async function runCouncil(
     process.env.OPENCODE_SERVER_URL ??
     process.env.OPENCODE_URL ??
     "http://localhost:4096";
-  // V2 client and reasoning parts temporarily disabled for debugging
-  // const v2Client = createOpencodeClientV2({
-  //   baseUrl: resolvedServerUrl,
-  //   directory: projectDir,
-  // });
-  // const reasoningPartID = randomUUID();
-  // const reasoningStartTime = Date.now();
-  const postProgress = (text: string, _options?: { end?: boolean }) => {
-    // Temporarily disabled: updateReasoningPart({...})
-    console.log("[Council Progress]", text.substring(0, 100));
+  // Progress logging (simplified)
+  const postProgress = (text: string) => {
+    console.log("[Council]", text.substring(0, 100));
   };
 
 
@@ -423,7 +381,7 @@ export async function runCouncil(
       directory: context.directory,
     });
 
-    await postProgress(renderProgress(), { end: true });
+    await postProgress(renderProgress());
 
     const voteSummary = votes
       .map((vote) => `- ${vote.voter} → Member ${vote.vote}`)
