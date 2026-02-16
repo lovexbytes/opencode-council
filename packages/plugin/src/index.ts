@@ -151,11 +151,13 @@ export const CouncilPlugin: Plugin = async (ctx) => {
           try {
             console.error(`[Council] Spawning: tmux ${tmuxArgs.join(" ")}`)
             
-            // Spawn without awaiting exit (tmux split-window -d returns immediately)
-            const proc = Bun.spawn(["tmux", ...tmuxArgs], {
+            // Spawn - keep pane open on error for debugging
+            const wrappedCmd = `(${tuiArgs}) || (echo "TUI CRASHED - check logs at /tmp/council-tui-*.log" && sleep 30)`
+            const finalArgs = [...tmuxArgs.slice(0, -1), wrappedCmd] // Replace last arg with wrapped version
+            
+            const proc = Bun.spawn(["tmux", ...finalArgs], {
               stdout: "inherit",
               stderr: "inherit",
-              detached: true, // Don't wait for process
             })
             
             // Quick check if process started (non-blocking)
