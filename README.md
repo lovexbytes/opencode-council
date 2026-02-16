@@ -22,19 +22,23 @@ npm install
 npm run build
 ```
 
-This creates `dist/plugin.js` which OpenCode can load.
+This creates `dist/plugin.js` (and `dist/opencode-council.js`) which OpenCode can load.
 
-## Installation in OpenCode
+## Installation in OpenCode (Local/Bun)
 
-Add the plugin to your OpenCode config. Since this isn't published to npm, use the local path:
+OpenCode loads local plugins from `.opencode/plugin/` or `.opencode/plugins/` directories
+and **does not** look in `~/.config/opencode/` for plugins.
 
 **Global install (recommended):**
 ```bash
-# Copy built plugin to OpenCode's plugin directory
-cp dist/plugin.js ~/.config/opencode/plugin/opencode-council.js
+# Copy built plugin to OpenCode's global plugin directory
+mkdir -p ~/.opencode/plugins
+cp dist/opencode-council.js ~/.opencode/plugins/opencode-council.js
 ```
 
-Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.opencode/config.json`):
+You can now either:
+- **Let auto-loading handle it** (no config needed), or
+- **Keep a plugin entry** in your config and it will resolve to the local file:
 
 ```json
 {
@@ -44,11 +48,11 @@ Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.
 }
 ```
 
-**Or use absolute path directly:**
+**Or use an absolute file URL directly:**
 ```json
 {
   "plugin": [
-    "file:///ABSOLUTE/PATH/opencode-council/dist/plugin.js"
+    "file:///ABSOLUTE/PATH/opencode-council/dist/opencode-council.js"
   ]
 }
 ```
@@ -58,7 +62,7 @@ Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.
 Create a council config file in one of these locations:
 
 1. `${PROJECT}/.opencode/council.json`
-2. `~/.config/opencode/council.json`
+2. `~/.opencode/council.json`
 3. Or set env var: `export OPENCODE_COUNCIL_CONFIG=/path/to/council.json`
 
 Example config:
