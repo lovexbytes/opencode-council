@@ -1,0 +1,11 @@
+{
+  "name": "opencode-council",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "bun run build:plugin && bun run build:tui",
+    "build:plugin": "cd packages/plugin && bun build ./src/index.ts --outdir dist --target bun",
+    "build:tui": "cd packages/tui && bun build ./src/index.tsx --outdir dist --target bun --external react --external ink --external react-devtools-core",
+    "install-global": "bash install.sh"
+  }
+}
