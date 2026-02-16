@@ -109,12 +109,10 @@ async function updateReasoningPart(input: {
 }): Promise<void> {
   try {
     await input.client.part.update({
-      path: {
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        partID: input.partID,
-      },
-      query: { directory: input.directory },
+      sessionID: input.sessionID,
+      messageID: input.messageID,
+      partID: input.partID,
+      directory: input.directory,
       part: {
         id: input.partID,
         sessionID: input.sessionID,
