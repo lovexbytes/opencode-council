@@ -16,6 +16,23 @@ const CouncilPlugin: Plugin = async (input: PluginInput): Promise<Hooks> => {
         },
       }),
     },
+    "command.execute.before": async (payload, output) => {
+      if (payload.command !== "council") return;
+      const args = payload.arguments.trim();
+      if (!args) return;
+
+      output.parts = output.parts.map((part) => {
+        if (part.type !== "text") return part;
+        if (!part.text.includes("{message}")) return part;
+
+        const replaced = part.text.replaceAll("{message}", args);
+        const trailing = new RegExp(`\\n\\n${args.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`);
+        return {
+          ...part,
+          text: replaced.replace(trailing, ""),
+        };
+      });
+    },
   };
 };
 
