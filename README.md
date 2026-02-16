@@ -34,8 +34,8 @@ OpenCode auto‑loads local plugins from **any** of these directories:
 **Global install (recommended):**
 ```bash
 # Copy built plugin to OpenCode's global plugin directory
-mkdir -p ~/.config/opencode/plugins
-cp dist/plugin.js ~/.config/opencode/plugins/opencode-council.js
+mkdir -p ~/.config/opencode/plugin
+cp dist/plugin.js ~/.config/opencode/plugin/opencode-council.js
 ```
 
 ✅ **No config entry needed.** OpenCode will auto‑load any `*.js`/`*.ts` file in those folders.
