@@ -31,14 +31,14 @@ Add the plugin to your OpenCode config. Since this isn't published to npm, use t
 **Global install (recommended):**
 ```bash
 # Copy built plugin to OpenCode's plugin directory
-cp dist/plugin.js ~/.config/opencode/plugins/opencode-council.js
+cp dist/plugin.js ~/.config/opencode/plugin/opencode-council.js
 ```
 
 Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.opencode/config.json`):
 
 ```json
 {
-  "plugins": [
+  "plugin": [
     "opencode-council"
   ]
 }
@@ -47,7 +47,7 @@ Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.
 **Or use absolute path directly:**
 ```json
 {
-  "plugins": [
+  "plugin": [
     "file:///ABSOLUTE/PATH/opencode-council/dist/plugin.js"
   ]
 }
