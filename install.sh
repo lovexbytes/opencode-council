@@ -6,22 +6,41 @@ CONFIG_DIR="${HOME}/.config/opencode"
 STANDARD_DIR="${CONFIG_DIR}/opencode-council"
 PLUGIN_DIR="${CONFIG_DIR}/plugin"
 
+# Get current directory
+CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Determine where to install from
-if [[ "$(cd "$(dirname "$0")" && pwd)" == "$STANDARD_DIR" ]]; then
+if [[ "$CURRENT_DIR" == "$STANDARD_DIR" ]]; then
   # Already in standard location
   COUNCIL_DIR="$STANDARD_DIR"
   echo "🔧 Installing OpenCode Council from standard location..."
+elif [ -d "$CURRENT_DIR/.git" ] && git -C "$CURRENT_DIR" remote -v 2>/dev/null | grep -q "opencode-council"; then
+  # Running from the git repo itself - use current location
+  COUNCIL_DIR="$CURRENT_DIR"
+  echo "🔧 Installing OpenCode Council from current directory..."
+  echo "  (Using: $COUNCIL_DIR)"
 else
   # Need to clone to standard location
   echo "📥 Installing to standard location: $STANDARD_DIR"
   if [ -d "$STANDARD_DIR/.git" ]; then
     echo "  (Updating existing installation)"
     cd "$STANDARD_DIR" && git pull
+    cd "$STANDARD_DIR"  # Ensure we're in the right dir after git pull
   else
     rm -rf "$STANDARD_DIR"  # Remove if exists but not git repo
-    git clone https://github.com/lovexbytes/opencode-council.git "$STANDARD_DIR"
+    echo "  Cloning repository..."
+    git clone https://github.com/lovexbytes/opencode-council.git "$STANDARD_DIR" || {
+      echo "❌ Failed to clone repository"
+      exit 1
+    }
   fi
   COUNCIL_DIR="$STANDARD_DIR"
+fi
+
+# Verify directory exists
+if [ ! -d "$COUNCIL_DIR" ]; then
+  echo "❌ Error: Directory $COUNCIL_DIR does not exist after clone"
+  exit 1
 fi
 
 echo "  Location: $COUNCIL_DIR"
