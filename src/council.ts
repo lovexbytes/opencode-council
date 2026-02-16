@@ -58,8 +58,8 @@ function indentText(text: string, prefix = "  "): string {
 
 function formatTranscript(entries: TranscriptEntry[]): string {
   return entries
-    .map((entry) => `**${entry.speaker}** (${entry.phase})\n\n${entry.content}`)
-    .join("\n\n---\n\n");
+    .map((entry) => `${entry.speaker} (${entry.phase})\n${entry.content}`)
+    .join("\n\n-----\n\n");
 }
 
 function pickJson(text: string): unknown {
@@ -176,10 +176,10 @@ export async function runCouncil(
   };
 
   const renderProgress = () => {
-    const lines: string[] = ["🏛 **Council Discussion in Progress**"];
+    const lines: string[] = ["🏛 Council Discussion in Progress"];
 
     // Phase 1: Initial Responses
-    lines.push("", "### 📋 Initial Responses");
+    lines.push("", "== 📋 Initial Responses ==");
     const initialComplete = streamState.initial.every((e) => e !== null);
     if (!initialComplete) {
       lines.push("⏳ Collecting initial responses from council members...");
@@ -187,13 +187,13 @@ export async function runCouncil(
     for (const entry of streamState.initial) {
       if (entry) {
         const indentedContent = indentText(entry.content);
-        lines.push(`✅ **${entry.name}**:\n${indentedContent}`);
+        lines.push(`✅ ${entry.name}:\n${indentedContent}`);
       }
     }
 
     // Phase 2: Discussion
     if (streamState.discussion.length > 0) {
-      lines.push("", "### 💬 Discussion");
+      lines.push("", "== 💬 Discussion ==");
       for (const entry of streamState.discussion) {
         lines.push(entry);
       }
@@ -202,13 +202,13 @@ export async function runCouncil(
     // Phase 3: Voting
     const votesComplete = streamState.votes.every((v) => v !== null);
     if (votesComplete || streamState.votes.some((v) => v !== null)) {
-      lines.push("", "### 🗳️ Voting");
+      lines.push("", "== 🗳️ Voting ==");
       if (!votesComplete) {
         lines.push("⏳ Collecting votes...");
       }
       for (const vote of streamState.votes) {
         if (vote) {
-          lines.push(`🗳️ **${vote.voter}** votes for: ${vote.choice}`);
+          lines.push(`🗳️ ${vote.voter} votes for: ${vote.choice}`);
         }
       }
     }
@@ -217,8 +217,8 @@ export async function runCouncil(
     if (streamState.winner) {
       lines.push(
         "",
-        "### 🏆 Winner",
-        `**${streamState.winner.name}** (${streamState.winner.votes} vote${streamState.winner.votes === 1 ? "" : "s"})`
+        "== 🏆 Winner ==",
+        `${streamState.winner.name} (${streamState.winner.votes} vote${streamState.winner.votes === 1 ? "" : "s"})`
       );
     }
 
@@ -258,9 +258,7 @@ export async function runCouncil(
           directory: context.directory,
         });
         transcript.push({ phase: "Initial", speaker: member.name, content: text });
-        // Truncate long responses for the progress display (500 chars max)
-        const displayText = text.length > 500 ? text.substring(0, 497) + "..." : text;
-        streamState.initial[index] = { name: memberLabel(member, index), content: displayText };
+        streamState.initial[index] = { name: memberLabel(member, index), content: text };
         // Send progress update after each response
         await sendProgress(
           input.client,
@@ -314,7 +312,7 @@ export async function runCouncil(
       if (decision.action === "ask_user") {
         const question = decision.question ?? "The Speaker needs more details.";
         needsUserInput = question;
-        streamState.discussion.push(`🎤 **Speaker**: ${question}`);
+        streamState.discussion.push(`🎤 Speaker: ${question}`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -325,7 +323,7 @@ export async function runCouncil(
       }
 
       if (decision.action === "end") {
-        streamState.discussion.push(`✅ **Speaker**: Discussion complete, moving to voting.`);
+        streamState.discussion.push(`✅ Speaker: Discussion complete, moving to voting.`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -339,7 +337,7 @@ export async function runCouncil(
         const targetIndex = typeof decision.target === "number" ? decision.target - 1 : 0;
         const member = members[targetIndex] ?? members[0];
         const question = decision.question ?? "Please clarify your recommendation.";
-        streamState.discussion.push(`🎤 **Speaker** → **${memberLabel(member, targetIndex)}**: ${question}`);
+        streamState.discussion.push(`🎤 Speaker -> ${memberLabel(member, targetIndex)}: ${question}`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -358,10 +356,7 @@ export async function runCouncil(
         });
 
         transcript.push({ phase: "Clarification", speaker: member.name, content: memberAnswer });
-        // Truncate long responses for display (500 chars max)
-        const displayAnswer = memberAnswer.length > 500 ? memberAnswer.substring(0, 497) + "..." : memberAnswer;
-        // Indented, muted styling using blockquote for council member responses
-        streamState.discussion.push(`💬 **${memberLabel(member, targetIndex)}**:\n${indentText(displayAnswer)}`);
+        streamState.discussion.push(`💬 ${memberLabel(member, targetIndex)}:\n${indentText(memberAnswer)}`);
         await sendProgress(
           input.client,
           context.sessionID,
@@ -475,15 +470,13 @@ export async function runCouncil(
     const output = [
       STAGES.join("\n"),
       needsUserInput
-        ? `\n**Speaker needs more input:** ${needsUserInput}\n\nPlease reply with the missing details and run the council tool again.`
+        ? `\nSpeaker needs more input: ${needsUserInput}\n\nPlease reply with the missing details and run the council tool again.`
         : "",
-      "\n## 🏆 Winning solution",
+      "\n== 🏆 Winning solution ==",
       speakerText,
-      "\n## 🗳️ Votes",
+      "\n== 🗳️ Votes ==",
       voteSummary || "- (no votes parsed)",
-      "\n<details>\n<summary>📜 Full council transcript</summary>\n\n" +
-        formatTranscript(transcript) +
-        "\n\n</details>",
+      "\n== 📜 Full council transcript ==\n" + formatTranscript(transcript),
     ]
       .filter(Boolean)
       .join("\n");

@@ -8,7 +8,7 @@ Multi‑model council deliberation for OpenCode with a Speaker‑led discussion,
 - Initial parallel responses from N models
 - Speaker‑led discussion with clarifying questions
 - Voting phase + final Speaker synthesis
-- Collapsible "Live council discussion" transcript
+- Full council transcript included in output
 - Configurable members (3–10) and Speaker model
 
 ## Build from Source
@@ -106,7 +106,15 @@ Use the council tool to answer: We're choosing between Redis, Memcached, and an 
 2. **Final output:**
    - Winning solution (most votes)
    - Vote breakdown
-   - Collapsible "Live council discussion" transcript
+   - Full council transcript
+
+## Display Notes (OpenCode TUI)
+
+- The OpenCode TUI renders chat messages as plain text. Markdown symbols (like `#`, `**`, or `<details>`) are not rendered.
+- Chat message font size cannot be changed by plugins.
+- Message colors are controlled by the active TUI theme, not by plugin output.
+
+For best results, the council output uses plain text formatting.
 
 ## Development
 
