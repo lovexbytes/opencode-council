@@ -176,23 +176,17 @@ export async function runCouncil(
     process.env.OPENCODE_SERVER_URL ??
     process.env.OPENCODE_URL ??
     "http://localhost:4096";
-  const v2Client = createOpencodeClientV2({
-    baseUrl: resolvedServerUrl,
-    directory: projectDir,
-  });
-  const reasoningPartID = randomUUID();
-  const reasoningStartTime = Date.now();
-  const postProgress = (text: string, options?: { end?: boolean }) =>
-    updateReasoningPart({
-      client: v2Client,
-      sessionID: context.sessionID,
-      messageID: context.messageID,
-      directory: projectDir,
-      partID: reasoningPartID,
-      text,
-      startTime: reasoningStartTime,
-      endTime: options?.end ? Date.now() : undefined,
-    });
+  // V2 client and reasoning parts temporarily disabled for debugging
+  // const v2Client = createOpencodeClientV2({
+  //   baseUrl: resolvedServerUrl,
+  //   directory: projectDir,
+  // });
+  // const reasoningPartID = randomUUID();
+  // const reasoningStartTime = Date.now();
+  const postProgress = (text: string, _options?: { end?: boolean }) => {
+    // Temporarily disabled: updateReasoningPart({...})
+    console.log("[Council Progress]", text.substring(0, 100));
+  };
 
 
   // State to track the content of each phase for the final result
