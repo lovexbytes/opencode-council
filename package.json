@@ -20,8 +20,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "NODE_ENV=development tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "postinstall": "npm install --include=dev"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.0.0",
