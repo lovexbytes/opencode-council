@@ -36,18 +36,24 @@ function extractText(parts: Part[]): string {
 }
 
 function memberLabel(member: CouncilMember, index?: number): string {
-  // Use seat number for display instead of model name
+  const modelName = member.model?.split("/").pop() ?? member.model ?? member.name;
+  // Use seat number for display with model name
   if (index !== undefined) {
-    return `Seat ${index + 1}`;
+    return `Seat ${index + 1} (${modelName})`;
   }
   // Fallback: extract seat number from member name if it follows "Member N" pattern
   const seatMatch = member.name.match(/Member\s+(\d+)/);
   if (seatMatch) {
-    return `Seat ${seatMatch[1]}`;
+    return `Seat ${seatMatch[1]} (${modelName})`;
   }
-  const fallback = member.name;
-  const model = member.model?.split("/").pop();
-  return model ? model : fallback;
+  return `${member.name} (${modelName})`;
+}
+
+function indentText(text: string, prefix = "  "): string {
+  return text
+    .split("\n")
+    .map((line) => `${prefix}${line}`)
+    .join("\n");
 }
 
 function formatTranscript(entries: TranscriptEntry[]): string {
@@ -180,9 +186,8 @@ export async function runCouncil(
     }
     for (const entry of streamState.initial) {
       if (entry) {
-        // Use blockquote for muted, indented styling
-        const indentedContent = entry.content.replace(/\n/g, '\n> ');
-        lines.push(`✅ **${entry.name}**:\n> ${indentedContent}`);
+        const indentedContent = indentText(entry.content);
+        lines.push(`✅ **${entry.name}**:\n${indentedContent}`);
       }
     }
 
@@ -356,7 +361,7 @@ export async function runCouncil(
         // Truncate long responses for display (500 chars max)
         const displayAnswer = memberAnswer.length > 500 ? memberAnswer.substring(0, 497) + "..." : memberAnswer;
         // Indented, muted styling using blockquote for council member responses
-        streamState.discussion.push(`💬 **${memberLabel(member, targetIndex)}**:\n> ${displayAnswer.replace(/\n/g, '\n> ')}`);
+        streamState.discussion.push(`💬 **${memberLabel(member, targetIndex)}**:\n${indentText(displayAnswer)}`);
         await sendProgress(
           input.client,
           context.sessionID,
