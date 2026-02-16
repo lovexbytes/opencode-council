@@ -8,32 +8,58 @@ Multi‑model council deliberation for OpenCode with a Speaker‑led discussion,
 - Initial parallel responses from N models
 - Speaker‑led discussion with clarifying questions
 - Voting phase + final Speaker synthesis
-- Collapsible “Live council discussion” transcript
+- Collapsible "Live council discussion" transcript
 - Configurable members (3–10) and Speaker model
 
-## Installation
+## Build from Source
+
+Clone the repo and build:
 
 ```bash
-npm install opencode-council
-# or
-bun add opencode-council
+git clone https://github.com/lovexbytes/opencode-council.git
+cd opencode-council
+npm install
+npm run build
 ```
 
-Then add the plugin to your OpenCode config (`~/.config/opencode/opencode.json` or project `.opencode/opencode.json`):
+This creates `dist/plugin.js` which OpenCode can load.
+
+## Installation in OpenCode
+
+Add the plugin to your OpenCode config. Since this isn't published to npm, use the local path:
+
+**Global install (recommended):**
+```bash
+# Copy built plugin to OpenCode's plugin directory
+cp dist/plugin.js ~/.config/opencode/plugins/opencode-council.js
+```
+
+Then add to your OpenCode config (`~/.config/opencode/config.json` or project `.opencode/config.json`):
 
 ```json
 {
-  "plugin": ["opencode-council"]
+  "plugins": [
+    "opencode-council"
+  ]
+}
+```
+
+**Or use absolute path directly:**
+```json
+{
+  "plugins": [
+    "file:///ABSOLUTE/PATH/opencode-council/dist/plugin.js"
+  ]
 }
 ```
 
 ## Configure Council Models
 
-Create a council config file in one of these locations (first match wins):
+Create a council config file in one of these locations:
 
 1. `${PROJECT}/.opencode/council.json`
 2. `~/.config/opencode/council.json`
-3. Set `OPENCODE_COUNCIL_CONFIG=/path/to/council.json`
+3. Or set env var: `export OPENCODE_COUNCIL_CONFIG=/path/to/council.json`
 
 Example config:
 
@@ -51,56 +77,84 @@ Example config:
 }
 ```
 
-> Requirements: 3–10 members, speaker model required.
+**Requirements:**
+- 3–10 members (excluding Speaker)
+- Speaker model must be specified
+- All models must be available in your OpenCode provider config
 
 ## Add the `/council` Command
 
-OpenCode commands are configured via `command` in your config. Add this entry:
+Add this to your OpenCode config:
 
 ```json
 {
   "command": {
     "council": {
       "description": "Run a multi-model council deliberation",
-      "template": "You must call the council tool with {message: $ARGUMENTS} and return its output verbatim."
+      "template": "Call the council tool with message: {message}"
     }
   }
 }
 ```
 
-Now you can run:
+## Usage
+
+In OpenCode, type:
 
 ```
 /council How should we refactor our caching layer for reliability?
 ```
 
-## What You’ll See
+Or with more context:
 
-- A stage header:
-  - “Council — initial discussions...”
-  - “Council — refining the solutions...”
-  - “Council — voting...”
-- A final “Winning solution” block
-- A collapsible “Live council discussion” transcript
+```
+/council We're choosing between Redis, Memcached, and an in-memory solution. What's best for our scale?
+```
 
-## Testing Locally
+## What You'll See
+
+1. **Stage indicator:**
+   - "Council — initial discussions..."
+   - "Council — refining the solutions..."
+   - "Council — voting..."
+
+2. **Final output:**
+   - Winning solution (most votes)
+   - Vote breakdown
+   - Collapsible "Live council discussion" transcript
+
+## Development
+
+To modify and rebuild:
 
 ```bash
+# Edit source files in src/
 npm run build
+# Restart OpenCode to load new build
 ```
 
-Then point OpenCode to the local plugin:
+## Troubleshooting
 
-```json
-{
-  "plugin": ["file:///ABSOLUTE/PATH/opencode-council/dist/plugin.js"]
-}
-```
+**Plugin not loading:**
+- Check the path in config is correct absolute path
+- Verify `dist/plugin.js` exists after build
 
-## Notes
+**Models not responding:**
+- Verify models in council.json are configured in OpenCode providers
+- Check that API keys for those providers are set
 
-- The council runs in a temporary session to avoid polluting your main chat.
-- If the Speaker asks for more input, the response will tell you what’s missing—reply and re‑run `/council`.
+**Discussion stuck:**
+- Speaker may be waiting for clarification
+- Check if any model returned an error
+
+## How It Works
+
+1. **Initial phase:** Your message is sent to all council members simultaneously
+2. **Discussion phase:** Speaker coordinates debate, asks clarifying questions
+3. **Voting phase:** Each model votes for best solution (can't vote for own)
+4. **Synthesis:** Speaker presents winning solution with reasoning
+
+The council runs in isolated sessions to avoid polluting your main chat history.
 
 ## License
 
