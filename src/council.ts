@@ -133,8 +133,15 @@ export async function runCouncil(
   const speakerRef = ensureSpeaker(config.speaker);
   const transcript: TranscriptEntry[] = [];
 
+  const resolvedServerUrl =
+    input.serverUrl?.toString?.() ??
+    config.serverUrl ??
+    process.env.OPENCODE_SERVER_URL ??
+    process.env.OPENCODE_URL ??
+    "http://localhost:4096";
+
   const streamingClient = createOpencodeClientV2({
-    baseUrl: input.serverUrl.toString(),
+    baseUrl: resolvedServerUrl,
     directory: projectDir,
   });
   const streamPartID = createPartId();

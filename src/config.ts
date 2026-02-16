@@ -6,6 +6,7 @@ import { z } from "zod";
 const CouncilConfigSchema = z.object({
   members: z.array(z.string()).min(3, "Council requires at least 3 members.").max(10, "Council supports up to 10 members."),
   speaker: z.string().min(1, "Speaker model is required."),
+  serverUrl: z.string().min(1, "serverUrl cannot be empty.").optional(),
   discussion: z
     .object({
       maxTurns: z.number().int().min(1).max(12).default(6),
