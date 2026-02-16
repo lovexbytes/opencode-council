@@ -20,18 +20,16 @@
     "README.md"
   ],
   "scripts": {
-    "build": "NODE_ENV=development tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "postinstall": "npm install --include=dev"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.0.0",
+    "@types/node": "^25.2.3",
+    "typescript": "^5.9.3",
     "zod": "^4.1.8"
   },
-  "devDependencies": {
-    "@types/node": "^25.2.3",
-    "typescript": "^5.9.3"
-  },
+  "devDependencies": {},
   "peerDependencies": {
     "@opencode-ai/plugin": "^1.0.0"
   },
