@@ -104,7 +104,11 @@ export const CouncilPlugin: Plugin = async (ctx) => {
           try {
             const check = Bun.spawn(["ls", "-la", tuiPath], { stdout: "pipe", stderr: "pipe" })
             await check.exited
+            const checkOutput = await new Response(check.stdout).text()
+            console.error(`[Council] TUI check: ${checkOutput.trim()}`)
             if (check.exitCode !== 0) {
+              const checkErr = await new Response(check.stderr).text()
+              console.error(`[Council] TUI not found: ${checkErr}`)
               return `Error: TUI not found at ${tuiPath}. Please run install.sh first.`
             }
           } catch (e: any) {
@@ -128,8 +132,8 @@ export const CouncilPlugin: Plugin = async (ctx) => {
               tmuxArgs.push("-h")
             }
             tmuxArgs.push("-p", String(config.tmux.percent))
-            // Don't steal focus
-            tmuxArgs.push("-d")
+            // Don't steal focus - but remove temporarily to debug
+            // tmuxArgs.push("-d")
           } else {
             tmuxArgs.push("new-window")
           }
@@ -137,22 +141,29 @@ export const CouncilPlugin: Plugin = async (ctx) => {
 
           try {
             console.error(`[Council] Spawning: tmux ${tmuxArgs.join(" ")}`)
+            
+            // Spawn without awaiting exit (tmux split-window -d returns immediately)
             const proc = Bun.spawn(["tmux", ...tmuxArgs], {
+              stdout: "inherit",
+              stderr: "inherit",
+              detached: true, // Don't wait for process
+            })
+            
+            // Quick check if process started (non-blocking)
+            await new Promise(r => setTimeout(r, 100))
+            
+            // Try to verify pane was created by listing panes
+            const checkProc = Bun.spawn(["tmux", "list-panes", "-F", "#{pane_title}"], {
               stdout: "pipe",
               stderr: "pipe",
             })
-            await proc.exited
-
-            const stderr = await new Response(proc.stderr).text()
-            const stdout = await new Response(proc.stdout).text()
+            await checkProc.exited
             
-            console.error(`[Council] tmux exit code: ${proc.exitCode}`)
-            console.error(`[Council] tmux stderr: ${stderr}`)
-            console.error(`[Council] tmux stdout: ${stdout}`)
-
-            if (proc.exitCode !== 0) {
-              return `Error spawning council tmux pane (code ${proc.exitCode}): ${stderr}`
+            if (checkProc.exitCode !== 0) {
+              return `Tmux error: Unable to list panes. Is tmux running?`
             }
+            
+            console.error(`[Council] Spawned successfully, check your tmux for new pane`)
           } catch (e: any) {
             return `Failed to spawn council: ${e.message}. Is tmux running?`
           }
