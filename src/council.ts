@@ -125,14 +125,17 @@ export async function runCouncil(
   context: ToolContext,
   message: string,
 ): Promise<string> {
-  const config = await loadCouncilConfig(context.directory);
+  // Fallback for undefined context.directory - use current working directory
+  const projectDir = context.directory || process.cwd();
+  
+  const config = await loadCouncilConfig(projectDir);
   const members = buildMembers(config);
   const speakerRef = ensureSpeaker(config.speaker);
   const transcript: TranscriptEntry[] = [];
 
   const streamingClient = createOpencodeClientV2({
     baseUrl: input.serverUrl.toString(),
-    directory: context.directory,
+    directory: projectDir,
   });
   const streamPartID = createPartId();
   let streamPart: StreamPart = {
