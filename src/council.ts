@@ -1,5 +1,6 @@
 import type { PluginInput, ToolContext } from "@opencode-ai/plugin";
-import { createOpencodeClient as createOpencodeClientV2 } from "@opencode-ai/sdk/v2";
+import { createOpencodeClient as createOpencodeClientV2, type OpencodeClient } from "@opencode-ai/sdk/v2";
+import { randomUUID } from "crypto";
 import { loadCouncilConfig, type CouncilConfig } from "./config";
 import { parseModelRef, type ModelRef } from "./models";
 
@@ -96,6 +97,41 @@ async function createDiscussionSession(input: PluginInput, context: ToolContext)
   return sessionID;
 }
 
+async function updateReasoningPart(input: {
+  client: OpencodeClient;
+  sessionID: string;
+  messageID: string;
+  directory: string;
+  partID: string;
+  text: string;
+  startTime: number;
+  endTime?: number;
+}): Promise<void> {
+  try {
+    await input.client.part.update({
+      path: {
+        sessionID: input.sessionID,
+        messageID: input.messageID,
+        partID: input.partID,
+      },
+      query: { directory: input.directory },
+      part: {
+        id: input.partID,
+        sessionID: input.sessionID,
+        messageID: input.messageID,
+        type: "reasoning",
+        text: input.text,
+        time: {
+          start: input.startTime,
+          ...(input.endTime ? { end: input.endTime } : {}),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to update reasoning part:", error);
+  }
+}
+
 async function promptModel(input: {
   client: PluginInput["client"];
   sessionID: string;
@@ -122,30 +158,6 @@ async function promptModel(input: {
   return text;
 }
 
-/**
- * Send a progress update message to the session.
- * This creates a visible message that the user sees immediately.
- */
-async function sendProgress(
-  client: PluginInput["client"],
-  sessionID: string,
-  directory: string,
-  text: string,
-): Promise<void> {
-  try {
-    await client.session.promptAsync({
-      path: { id: sessionID },
-      query: { directory },
-      body: {
-        noReply: true, // Don't generate a response
-        parts: [{ type: "text", text }],
-      },
-    });
-  } catch (error) {
-    // Silently ignore progress message failures - not critical
-    console.error("Failed to send progress:", error);
-  }
-}
 
 export async function runCouncil(
   input: PluginInput,
@@ -166,6 +178,24 @@ export async function runCouncil(
     process.env.OPENCODE_SERVER_URL ??
     process.env.OPENCODE_URL ??
     "http://localhost:4096";
+  const v2Client = createOpencodeClientV2({
+    baseUrl: resolvedServerUrl,
+    directory: projectDir,
+  });
+  const reasoningPartID = randomUUID();
+  const reasoningStartTime = Date.now();
+  const postProgress = (text: string, options?: { end?: boolean }) =>
+    updateReasoningPart({
+      client: v2Client,
+      sessionID: context.sessionID,
+      messageID: context.messageID,
+      directory: projectDir,
+      partID: reasoningPartID,
+      text,
+      startTime: reasoningStartTime,
+      endTime: options?.end ? Date.now() : undefined,
+    });
+
 
   // State to track the content of each phase for the final result
   const streamState = {
@@ -226,23 +256,13 @@ export async function runCouncil(
   };
 
   // Send initial progress message
-  await sendProgress(
-    input.client,
-    context.sessionID,
-    context.directory,
-    "🏛 Council Discussion starting..."
-  );
+  await postProgress("🏛 Council Discussion starting...");
 
   const councilSessionID = await createDiscussionSession(input, context);
 
   try {
     // Phase 1: Initial Responses
-    await sendProgress(
-      input.client,
-      context.sessionID,
-      context.directory,
-      STAGES[0]
-    );
+    await postProgress(STAGES[0]);
 
     const initialPrompt = `You are a council member. Provide your best response to the user request.\n\nDeliverables:\n- Key considerations\n- Risks or blind spots\n- Recommended approach\n\nUser request:\n${message}`;
 
@@ -260,12 +280,7 @@ export async function runCouncil(
         transcript.push({ phase: "Initial", speaker: member.name, content: text });
         streamState.initial[index] = { name: memberLabel(member, index), content: text };
         // Send progress update after each response
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
         return { member, text };
       }),
     );
@@ -273,12 +288,7 @@ export async function runCouncil(
     let needsUserInput: string | null = null;
 
     // Phase 2: Discussion
-    await sendProgress(
-      input.client,
-      context.sessionID,
-      context.directory,
-      STAGES[1]
-    );
+    await postProgress(STAGES[1]);
 
     for (let turn = 0; turn < config.discussion.maxTurns; turn++) {
       const discussionPrompt = `You are the Council Speaker. Review the discussion so far and decide the next action.\n\nAvailable actions:\n- ask_member: ask one member a clarifying question\n- ask_user: request missing info from the user\n- end: finish discussion and move to voting\n\nReturn ONLY valid JSON with this shape:\n{ "action": "ask_member" | "ask_user" | "end", "target": number, "question": string, "summary": string }\n\nContext:\nUser request: ${message}\n\nInitial responses:\n${initialResponses
@@ -313,23 +323,13 @@ export async function runCouncil(
         const question = decision.question ?? "The Speaker needs more details.";
         needsUserInput = question;
         streamState.discussion.push(`🎤 Speaker: ${question}`);
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
         break;
       }
 
       if (decision.action === "end") {
         streamState.discussion.push(`✅ Speaker: Discussion complete, moving to voting.`);
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
         break;
       }
 
@@ -338,12 +338,7 @@ export async function runCouncil(
         const member = members[targetIndex] ?? members[0];
         const question = decision.question ?? "Please clarify your recommendation.";
         streamState.discussion.push(`🎤 Speaker -> ${memberLabel(member, targetIndex)}: ${question}`);
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
 
         const memberAnswer = await promptModel({
           client: input.client,
@@ -357,22 +352,12 @@ export async function runCouncil(
 
         transcript.push({ phase: "Clarification", speaker: member.name, content: memberAnswer });
         streamState.discussion.push(`💬 ${memberLabel(member, targetIndex)}:\n${indentText(memberAnswer)}`);
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
       }
     }
 
     // Phase 3: Voting
-    await sendProgress(
-      input.client,
-      context.sessionID,
-      context.directory,
-      STAGES[2]
-    );
+    await postProgress(STAGES[2]);
 
     const votingPrompt = `You are in the voting phase. Review the council discussion and select the strongest solution.\n\nReturn ONLY valid JSON with this shape:\n{ "vote": number, "reason": string }\n\nVote must be the member number (1-${members.length}).\n\nInitial responses:\n${initialResponses
       .map((entry) => `${entry.member.name}: ${entry.text}`)
@@ -402,12 +387,7 @@ export async function runCouncil(
           choice: choiceLabel,
         };
 
-        await sendProgress(
-          input.client,
-          context.sessionID,
-          context.directory,
-          renderProgress()
-        );
+        await postProgress(renderProgress());
 
         return {
           voter: member.name,
@@ -435,12 +415,7 @@ export async function runCouncil(
       votes: winnerVotes,
     };
 
-    await sendProgress(
-      input.client,
-      context.sessionID,
-      context.directory,
-      STAGES[3]
-    );
+    await postProgress(STAGES[3]);
 
     const speakerPrompt = `You are the Council Speaker. Produce the final response for the user.\n\nUser request:\n${message}\n\nWinning member: ${winner.name} (Member ${winnerIndex})\n\nInitial responses:\n${initialResponses
       .map((entry) => `${entry.member.name}: ${entry.text}`)
@@ -456,12 +431,7 @@ export async function runCouncil(
       directory: context.directory,
     });
 
-    await sendProgress(
-      input.client,
-      context.sessionID,
-      context.directory,
-      renderProgress()
-    );
+    await postProgress(renderProgress(), { end: true });
 
     const voteSummary = votes
       .map((vote) => `- ${vote.voter} → Member ${vote.vote}`)
