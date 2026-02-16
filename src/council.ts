@@ -125,7 +125,7 @@ async function promptModel(input: {
 export async function runCouncil(
   input: PluginInput,
   context: ToolContext,
-  message: string,
+  query: string,
 ): Promise<string> {
   // Fallback for undefined context.directory - use current working directory
   const projectDir = context.directory || process.cwd();
@@ -214,7 +214,7 @@ export async function runCouncil(
     // Phase 1: Initial Responses
     await postProgress(STAGES[0]);
 
-    const initialPrompt = `You are a council member. Provide your best response to the user request.\n\nDeliverables:\n- Key considerations\n- Risks or blind spots\n- Recommended approach\n\nUser request:\n${message}`;
+    const initialPrompt = `You are a council member. Provide your best response to the user request.\n\nDeliverables:\n- Key considerations\n- Risks or blind spots\n- Recommended approach\n\nUser request:\n${query}`;
 
     const initialResponses = await Promise.all(
       members.map(async (member, index) => {
@@ -241,7 +241,7 @@ export async function runCouncil(
     await postProgress(STAGES[1]);
 
     for (let turn = 0; turn < config.discussion.maxTurns; turn++) {
-      const discussionPrompt = `You are the Council Speaker. Review the discussion so far and decide the next action.\n\nAvailable actions:\n- ask_member: ask one member a clarifying question\n- ask_user: request missing info from the user\n- end: finish discussion and move to voting\n\nReturn ONLY valid JSON with this shape:\n{ "action": "ask_member" | "ask_user" | "end", "target": number, "question": string, "summary": string }\n\nContext:\nUser request: ${message}\n\nInitial responses:\n${initialResponses
+      const discussionPrompt = `You are the Council Speaker. Review the discussion so far and decide the next action.\n\nAvailable actions:\n- ask_member: ask one member a clarifying question\n- ask_user: request missing info from the user\n- end: finish discussion and move to voting\n\nReturn ONLY valid JSON with this shape:\n{ "action": "ask_member" | "ask_user" | "end", "target": number, "question": string, "summary": string }\n\nContext:\nUser request: ${query}\n\nInitial responses:\n${initialResponses
         .map((entry) => `${entry.member.name}: ${entry.text}`)
         .join("\n\n")}\n\nTranscript so far:\n${transcript.map((entry) => `${entry.speaker} (${entry.phase}): ${entry.content}`).join("\n\n")}`;
 
@@ -367,7 +367,7 @@ export async function runCouncil(
 
     await postProgress(STAGES[3]);
 
-    const speakerPrompt = `You are the Council Speaker. Produce the final response for the user.\n\nUser request:\n${message}\n\nWinning member: ${winner.name} (Member ${winnerIndex})\n\nInitial responses:\n${initialResponses
+    const speakerPrompt = `You are the Council Speaker. Produce the final response for the user.\n\nUser request:\n${query}\n\nWinning member: ${winner.name} (Member ${winnerIndex})\n\nInitial responses:\n${initialResponses
       .map((entry) => `${entry.member.name}: ${entry.text}`)
       .join("\n\n")}\n\nDiscussion transcript:\n${transcript.map((entry) => `${entry.speaker} (${entry.phase}): ${entry.content}`).join("\n\n")}\n\nVoting summary:\n${votes.map((vote) => `${vote.voter} voted for Member ${vote.vote} (${vote.reason})`).join("\n")}\n\nDeliver a clear, actionable final response. If critical details are missing, state them explicitly.`;
 
